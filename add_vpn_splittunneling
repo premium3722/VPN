@@ -1,0 +1,56 @@
+##################Hier anpassen#########################################################
+
+$importcert = $false                                         # Soll das Zertifikat auch importiert werden, wenn ja auf true setzen
+$importcertpath = "C:\windows\temp\${serveraddress}.crt"     # Nur relevant wenn Import zertifikat true
+
+$connectionname = "MYDOMAIN"                                 # Name für die VPN verbindung frei wählbar aber einmalig
+$serveraddress = "vpn.MYDOMAIN.ch"                           # Serveradresse für den Tunnel
+$destinationsbnt = "192.168.1.0/24"                          # Das Remotesubnetz vom Kunden
+$dnssuffix = "MYDOMAIN.ch"                                   # Dns Suffix ist die Domain von kunden, wird für die Namensauflösung gebraucht
+
+$userascred =$false                                          # Soll das UseRAasCredential auf 0 gesetzt werden. = Es braucht für Networkshares nicht die VPN Daten.
+
+#########################################################################################
+# Zertifikat import nur wenn $importcert auf true
+if ($importcert -eq $true) 
+{
+    Import-Certificate -FilePath $importcertpath -CertStoreLocation "Cert:\LocalMachine\Root"   #Zertifikat wird in die Vertauenswürdige Stammcertifizierung importiert
+}
+
+#Fügt den VPN zu Windows hinzu. Dabei wird der Name, Serveradress, Split Tunneling, Auf allen Profilen und DNS SUffix gesetzt.
+Add-VpnConnection -Name $connectionname -ServerAddress $serveraddress -TunnelType Ikev2 -EncryptionLevel "Maximum" -AuthenticationMethod Eap  -SplitTunneling -RememberCredential -AllUserConnection -DnsSuffix $dnssuffix -PassThru 
+
+#Nachfolgend wird das Subnetz für den Kunden hinzugefügt, dass das Routing funktioneirt
+Add-VpnConnectionRoute -ConnectionName $connectionname -DestinationPrefix $destinationsbnt
+
+# Nachfolgend wird der Wert UseRASCredential auf 0 gesetzt. Dies ist notwendig, dass windows nicht die login daten vom VPN verwenden will für Network shares
+if ($userascred -eq $true) #Dies wird nr
+{
+    If ((Test-Path $RasphonePath) -eq $False) 
+    {
+        Write-Output 'Rasphone.pbk nicht gefunden.'
+        Exit 1
+    }
+    else
+    {
+      $RasphonePath = Join-Path -Path $env:ProgramData -ChildPath '\Microsoft\Network\Connections\Pbk\rasphone.pbk'
+      $RasphoneData = Get-Content $RasphonePath
+
+      If ($RasphoneData.UseRasCredentials -eq '1') 
+      {
+        Try 
+        {
+          $RasphoneData | ForEach-Object { $_ -Replace 'UseRasCredentials=1', 'UseRasCredentials=0' } | Set-Content -Path $RasphonePath -Force
+        }
+        Catch 
+        {
+          $ErrorMessage = $_.Exception.Message 
+          Write-Warning $ErrorMessage
+        }
+      }
+    Else 
+    {
+      Write-Output 'UseRasCredentials ist bereits auf 0.'  
+    }
+  }
+}
