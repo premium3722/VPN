@@ -1,14 +1,16 @@
 ##################Hier anpassen#########################################################
+$connections = @{
+  
+    "NAMETUNNEL" = @{                                        # Name für die VPN verbindung frei wählbar aber einmalig
+      "ServerAddress" = "vpn.mydomain.ch"                        # Serveradresse für den Tunnel
+      "DestinationSubnet" = @("192.168.1.0/24")              # Das Remotesubnetz vom Kunden
+      "DnsSuffix" = "mydomain.local"                        # Dns Suffix ist die Domain von kunden, wird für die Namensauflösung gebraucht
+    }
+}
 
 $importcert = $false                                         # Soll das Zertifikat auch importiert werden, wenn ja auf true setzen
 $importcertpath = "C:\windows\temp\${serveraddress}.crt"     # Nur relevant wenn Import zertifikat true
-
-$connectionname = "MYDOMAIN"                                 # Name für die VPN verbindung frei wählbar aber einmalig
-$serveraddress = "vpn.MYDOMAIN.ch"                           # Serveradresse für den Tunnel
-$destinationsbnt = "192.168.1.0/24"                          # Das Remotesubnetz vom Kunden
-$dnssuffix = "MYDOMAIN.ch"                                   # Dns Suffix ist die Domain von kunden, wird für die Namensauflösung gebraucht
-
-$userascred =$false                                          # Soll das UseRAasCredential auf 0 gesetzt werden. = Es braucht für Networkshares nicht die VPN Daten.
+$userascred =$false                                          # Soll das UseRAasCredential auf 0 gesetzt werden. = Es braucht für Networkshares nicht die VPN Login Daten.
 
 #########################################################################################
 # Zertifikat import nur wenn $importcert auf true
@@ -17,14 +19,52 @@ if ($importcert -eq $true)
     Import-Certificate -FilePath $importcertpath -CertStoreLocation "Cert:\LocalMachine\Root"   #Zertifikat wird in die Vertauenswürdige Stammcertifizierung importiert
 }
 
-#Fügt den VPN zu Windows hinzu. Dabei wird der Name, Serveradress, Split Tunneling, Auf allen Profilen und DNS SUffix gesetzt.
-Add-VpnConnection -Name $connectionname -ServerAddress $serveraddress -TunnelType Ikev2 -EncryptionLevel "Maximum" -AuthenticationMethod Eap  -SplitTunneling -RememberCredential -AllUserConnection -DnsSuffix $dnssuffix -PassThru 
+#########################################################################################
+  foreach ($connection in $connections.GetEnumerator()) 
+  {
+      $connectionname = $connection.Key
+      $serveraddress = $connection.Value.ServerAddress
+      $destinationsubnet = $connection.Value.DestinationSubnet
+      $dnssuffix = $connection.Value.DnsSuffix
+      Write-Host "-----------------------------------"
+      # Fügt den VPN zu Windows hinzu. Dabei wird der Name, Serveradress, Split Tunneling, Auf allen Profilen und DNS Suffix gesetzt.
+      Write-Host "$connectionname wird versucht hinzuzufügen"
+      Try 
+      {
+            Add-VpnConnection -Name $connectionname -ServerAddress $serveraddress -TunnelType Ikev2 -EncryptionLevel "Maximum" -AuthenticationMethod Eap  -SplitTunneling -RememberCredential -AllUserConnection -DnsSuffix $dnssuffix -PassThru 
+            Write-Host "$connectionname wurde hinzugefügt"
+      }
+      Catch
+      {
+        Write-Host "Besteht bereits oder konnte nicht hinzugefügt werden"
+      }
+      # Nachfolgend wird das Subnetz für den Kunden hinzugefügt, damit das Routing funktioniert
+      foreach ($subnet in $destinationsubnet) 
+      {
+        Try 
+        {
+            Add-VpnConnectionRoute -ConnectionName $connectionname -DestinationPrefix $subnet
+            Write-Host "Das Subnet $subnet wurde zum Routing hinzugefügt"
+            Write-Host " "
+        }
+        Catch 
+        {
+            Write-Host "Subnetz $subnet konnte nicht hinzugefügt werden"
+        }
+      }
+      Write-Host "-----------------------------------"
+      Write-Host " "
+  
+      $conn = get-vpnconnection -AllUserConnection -ConnectionName $connectionname
+      $conn.routes
+      
+      Write-Host "-----------------------------------"
+      Write-Host " "
+  }
 
-#Nachfolgend wird das Subnetz für den Kunden hinzugefügt, dass das Routing funktioneirt
-Add-VpnConnectionRoute -ConnectionName $connectionname -DestinationPrefix $destinationsbnt
-
+##########################USE RASCretential###############################################
 # Nachfolgend wird der Wert UseRASCredential auf 0 gesetzt. Dies ist notwendig, dass windows nicht die login daten vom VPN verwenden will für Network shares
-if ($userascred -eq $true) #Dies wird nr
+if ($userascred -eq $true) #Dies wird nur ausgeführt wenn in der Variable usercred auf $true ist
 {
     If ((Test-Path $RasphonePath) -eq $False) 
     {
@@ -41,6 +81,7 @@ if ($userascred -eq $true) #Dies wird nr
         Try 
         {
           $RasphoneData | ForEach-Object { $_ -Replace 'UseRasCredentials=1', 'UseRasCredentials=0' } | Set-Content -Path $RasphonePath -Force
+          Write-Output "UseRasCredentials wurde auf 0 gesetzt."
         }
         Catch 
         {
