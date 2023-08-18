@@ -9,7 +9,7 @@ $connections = @{
 }
 
 $importcert = $false                                         # Soll das Zertifikat auch importiert werden, wenn ja auf true setzen
-$importcertpath = "C:\windows\temp\${serveraddress}.crt"     # Nur relevant wenn Import zertifikat true
+  $importcertpath = "C:\windows\temp\${serveraddress}.crt"     # Nur relevant wenn Import zertifikat true
 $userascred =$false                                          # Soll das UseRAasCredential auf 0 gesetzt werden. = Es braucht für Networkshares nicht die VPN Login Daten.
 
 #########################################################################################
