@@ -26,40 +26,45 @@ if ($importcert -eq $true)
       $serveraddress = $connection.Value.ServerAddress
       $destinationsubnet = $connection.Value.DestinationSubnet
       $dnssuffix = $connection.Value.DnsSuffix
-      Write-Host "-----------------------------------"
+      Write-Host "▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼"
+      Write-Host "▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲"
       # Fügt den VPN zu Windows hinzu. Dabei wird der Name, Serveradress, Split Tunneling, Auf allen Profilen und DNS Suffix gesetzt.
-      Write-Host "$connectionname wird versucht hinzuzufügen"
+      Write-Host "1. $connectionname wird versucht hinzuzufügen"
       Try 
       {
             Add-VpnConnection -Name $connectionname -ServerAddress $serveraddress -TunnelType Ikev2 -EncryptionLevel "Maximum" -AuthenticationMethod Eap  -SplitTunneling -RememberCredential -AllUserConnection -DnsSuffix $dnssuffix -PassThru 
-            Write-Host "$connectionname wurde hinzugefügt"
+            Write-Host "   1.1 $connectionname wurde hinzugefügt" -ForegroundColor Green
       }
       Catch
       {
-        Write-Host "Besteht bereits oder konnte nicht hinzugefügt werden"
+        Write-Host "   1.X Besteht bereits oder konnte nicht hinzugefügt werden" -ForegroundColor Red
       }
       # Nachfolgend wird das Subnetz für den Kunden hinzugefügt, damit das Routing funktioniert
+      Write-Host "2. Wird Versucht Routing hinzuzufügen"
       foreach ($subnet in $destinationsubnet) 
       {
         Try 
         {
             Add-VpnConnectionRoute -ConnectionName $connectionname -DestinationPrefix $subnet
-            Write-Host "Das Subnet $subnet wurde zum Routing hinzugefügt"
+            Write-Host "    2.2 Das Subnet $subnet wurde zum Routing hinzugefügt" -ForegroundColor Green
             Write-Host " "
         }
         Catch 
         {
-            Write-Host "Subnetz $subnet konnte nicht hinzugefügt werden"
+            Write-Host "   2.X Subnetz $subnet konnte nicht hinzugefügt werden" -ForegroundColor Red
         }
       }
-      Write-Host "-----------------------------------"
-      Write-Host " "
+      Write-Host "▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼"
+      Write-Host "▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲"
   
       $conn = get-vpnconnection -AllUserConnection -ConnectionName $connectionname
-      $conn.routes
-      
-      Write-Host "-----------------------------------"
-      Write-Host " "
+      $routesoutput = $conn.routes | Select-Object -ExpandProperty "DestinationPrefix"
+ 
+      Write-Host "3. Routen übesicht "
+      Write-Host "   $routesoutput" -ForegroundColor Green
+
+      Write-Host "▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼"
+      Write-Host "▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲"
   }
 
 ##########################USE RASCretential###############################################
@@ -94,4 +99,5 @@ if ($userascred -eq $true) #Dies wird nur ausgeführt wenn in der Variable userc
       Write-Output 'UseRasCredentials ist bereits auf 0.'  
     }
   }
+  Write-Host "Script Fertig"
 }
